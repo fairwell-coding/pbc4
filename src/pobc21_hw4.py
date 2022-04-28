@@ -220,8 +220,8 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
 
     # network and simulation parameters
 
-    num_input_with_events = 100
-    num_input_no_events = 100
+    num_input_with_events = 100  # blue neurons
+    num_input_no_events = 100  # red neurons
 
     t_sim = t_sim * second
 
@@ -229,38 +229,39 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
 
     net = brian2.Network()
 
-    # ----------------------------------------------------------------------
-    # TODO beginning
-
     # neuron and synapse parameters
-
-    ...
-
+    r_bg = 8 * Hz
+    r_event = 2 * Hz  # additional organized events for blue neurons
+    theta = -55 * mV
+    u_reset = -70 * mV
+    delta_abs = 1 * ms
+    tau_syn = 10 * ms
+    R_m = 0.03 * Gohm
+    C_m = 1500 * pF
 
     # setup neuron
     # note: use I_syn as name for the synaptic current (assumed below)
 
-    ...
+    lif_eqs = '''
+    du/dt = ( -(u - u_rest) + R_m * I_syn(t)) / tau_m : volt (unless refractory)
+    dI_syn/dt = - I_syn / tau_syn : ampere (unless refractory)
+    '''
 
-    neuron = NeuronGroup(...)
+    blue_neurons = NeuronGroup(num_input_with_events, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
+    red_neurons = NeuronGroup(num_input_no_events, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
 
-    ...
-
-    spike_mon = SpikeMonitor(...)  # monitor the neuron's spikes
+    blue_spike_mon = SpikeMonitor(blue_neurons)
+    red_spike_mon = SpikeMonitor(red_neurons)
 
     # setup inputs
-
     num_input = num_input_with_events + num_input_no_events
 
     stim_ids, stim_times = generate_stimulus(t_sim / ms, 8., 2., jitter, sequence, num_neurons=num_input)
 
-    inputs = SpikeGeneratorGroup(...)
-
-    input_spike_mon = SpikeMonitor(...)  # monitor input spikes
+    inputs = SpikeGeneratorGroup(num_input, stim_ids, stim_times)
+    input_spike_mon = SpikeMonitor(inputs)
 
     # setup synapses
-
-    ...
 
     synapses = Synapses(...)
 
@@ -273,7 +274,7 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
 
     # define units for main simulation
 
-    units = [neuron, spike_mon, inputs, input_spike_mon, synapses, syn_state_mon]
+    units = [blue_neurons, red_neurons, blue_spike_mon, red_spike_mon, inputs, input_spike_mon, synapses, syn_state_mon]
 
     net.add(units)
 
