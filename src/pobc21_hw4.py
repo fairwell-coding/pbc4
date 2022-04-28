@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import brian2
-from brian2 import NeuronGroup, SpikeGeneratorGroup, SpikeMonitor, StateMonitor, Synapses
+from brian2 import NeuronGroup, SpikeGeneratorGroup, SpikeMonitor, StateMonitor, Synapses, where, exp
 from brian2 import mV, pA, pF, ms, second, Hz, Gohm
 import brian2.numpy_ as np
 import matplotlib.pyplot as plt
@@ -255,26 +255,52 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
 
     # setup inputs
     num_input = num_input_with_events + num_input_no_events
-
     stim_ids, stim_times = generate_stimulus(t_sim / ms, 8., 2., jitter, sequence, num_neurons=num_input)
-
-    inputs = SpikeGeneratorGroup(num_input, stim_ids, stim_times)
+    inputs = SpikeGeneratorGroup(num_input, stim_ids, stim_times * ms)
     input_spike_mon = SpikeMonitor(inputs)
 
     # setup synapses
+    tau_plus = 30 * ms
+    tau_minus = 30 * ms
+    lambda_ = 1 * pA
+    alpha = 1.1
+    w_0 = 100 * pA
+    w_max = 200 * pA
 
-    synapses = Synapses(...)
+    lif_neuron = NeuronGroup(1, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
+    lif_spike_mon = SpikeMonitor(lif_neuron)
 
-    ...
+    # model = '''w:1
+    #          dApre/dt=-Apre/taupre : 1 (event-driven)
+    #          dApost/dt=-Apost/taupost : 1 (event-driven)
+    #
+    #
+    #         dtau_minus / dt = -lambda * alpha * exp(-abs(tau_plus - tau_minus) / tau_minus) : 1(event - driven)
+    #         dtau_minus / dt = -lambda * alpha * exp(-abs(tau_plus - tau_minus) / tau_minus) : 1(event - driven)
+    # '''
 
-    syn_state_mon = StateMonitor(synapses, ['w'], record=True, dt=1 * second)  # monitor the weights
+    delta_t = lif_spike_mon.t - blue_spike_mon.t  # TODO: check me
+    weight_update = where(delta_t >= 0, lambda_ / pA * exp(-abs(delta_t) / tau_plus), - lambda_ / pA * alpha * exp(-abs(delta_t) / tau_minus))
 
-    # TODO end
-    # ----------------------------------------------------------------------
+    S_pre = inputs.spikes[: num_input_with_events]
+    S_post = inputs.spikes[num_input_with_events:]
+
+    model = '''w:1
+             dApre/dt=-Apre/tau_plus + S_pre(t) : 1 (event-driven)
+             dApost/dt=-Apost/tau_minus + S_post(t) : 1 (event-driven)
+    '''
+
+    blue_synapses = Synapses(blue_neurons, lif_neuron, model, on_pre=weight_update)
+    blue_synapses.connect()
+
+    red_synapses = Synapses(red_neurons, lif_neuron, model, on_pre=weight_update)
+    red_synapses.connect()
+
+    blue_syn_state_mon = StateMonitor(blue_synapses, ['w'], record=True, dt=1 * second)  # monitor the weights
+    red_syn_state_mon = StateMonitor(red_synapses, ['w'], record=True, dt=1 * second)  # monitor the weights
 
     # define units for main simulation
-
-    units = [blue_neurons, red_neurons, blue_spike_mon, red_spike_mon, inputs, input_spike_mon, synapses, syn_state_mon]
+    units = [blue_neurons, red_neurons, lif_neuron, blue_spike_mon, red_spike_mon, lif_spike_mon, inputs, input_spike_mon, blue_synapses, red_synapses, blue_syn_state_mon, red_syn_state_mon]
 
     net.add(units)
 
