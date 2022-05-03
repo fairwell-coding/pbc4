@@ -270,30 +270,41 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     lif_neuron = NeuronGroup(1, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
     lif_spike_mon = SpikeMonitor(lif_neuron)
 
-    # model = '''w:1
-    #          dApre/dt=-Apre/taupre : 1 (event-driven)
-    #          dApost/dt=-Apost/taupost : 1 (event-driven)
-    #
-    #
-    #         dtau_minus / dt = -lambda * alpha * exp(-abs(tau_plus - tau_minus) / tau_minus) : 1(event - driven)
-    #         dtau_minus / dt = -lambda * alpha * exp(-abs(tau_plus - tau_minus) / tau_minus) : 1(event - driven)
-    # '''
+    # blue_delta_t = lif_spike_mon.t - blue_spike_mon.t  # TODO: check me
+    # red_delta_t = lif_spike_mon.t - red_spike_mon.t  # TODO: check me
+    # blue_weight_update = __update_synapse_weights(alpha, blue_delta_t, lambda_, tau_minus, tau_plus)
+    # red_weight_update = __update_synapse_weights(alpha, red_delta_t, lambda_, tau_minus, tau_plus)
 
-    delta_t = lif_spike_mon.t - blue_spike_mon.t  # TODO: check me
-    weight_update = where(delta_t >= 0, lambda_ / pA * exp(-abs(delta_t) / tau_plus), - lambda_ / pA * alpha * exp(-abs(delta_t) / tau_minus))
-
-    S_pre = inputs.spikes[: num_input_with_events]
-    S_post = inputs.spikes[num_input_with_events:]
+    blue_S_pre = inputs.spikes[: num_input_with_events]
+    red_S_pre = inputs.spikes[num_input_with_events:]
+    lif_S_post = lif_spike_mon.t
 
     model = '''w:1
-             dApre/dt=-Apre/tau_plus + S_pre(t) : 1 (event-driven)
-             dApost/dt=-Apost/tau_minus + S_post(t) : 1 (event-driven)
+             dApre/dt=-Apre/tau_plus : 1 (event-driven)
+             dApost/dt=-Apost/tau_minus : 1 (event-driven)
     '''
 
-    blue_synapses = Synapses(blue_neurons, lif_neuron, model, on_pre=weight_update)
+    blue_on_pre = '''
+        v_post += w
+        Apre += blue_S_pre(t)
+        w = clip(w+apost, 0, w_max)
+    '''
+
+    red_on_pre = '''
+        v_post += w
+        Apre += red_S_pre(t)
+        w = clip(w+apost, 0, w_max)
+    '''
+
+    on_post = '''
+        Apost += lif_S_post(t)
+        w = clip(w+apre, 0, w_max)
+    '''
+
+    blue_synapses = Synapses(blue_neurons, lif_neuron, model, on_pre=blue_on_pre, on_post=on_post)
     blue_synapses.connect()
 
-    red_synapses = Synapses(red_neurons, lif_neuron, model, on_pre=weight_update)
+    red_synapses = Synapses(red_neurons, lif_neuron, model, on_pre=red_on_pre, on_post=on_post)
     red_synapses.connect()
 
     blue_syn_state_mon = StateMonitor(blue_synapses, ['w'], record=True, dt=1 * second)  # monitor the weights
@@ -538,6 +549,10 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
 
     if title:
         plt.savefig(join(outdir, title + '_correlations.pdf'))
+
+
+def __update_synapse_weights(alpha, delta_t, lambda_, tau_minus, tau_plus):
+    return where(delta_t >= 0, lambda_ / pA * exp(-abs(delta_t) / tau_plus), - lambda_ / pA * alpha * exp(-abs(delta_t) / tau_minus))  # equation (3)
 
 
 if __name__ == '__main__':
