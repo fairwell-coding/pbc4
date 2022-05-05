@@ -240,24 +240,20 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     C_m = 1500 * pF
 
     # setup neuron
-    # note: use I_syn as name for the synaptic current (assumed below)
-
     lif_eqs = '''
     du/dt = ( -(u - u_rest) + R_m * I_syn(t)) / tau_m : volt (unless refractory)
-    dI_syn/dt = - I_syn / tau_syn : ampere (unless refractory)
+    dI_syn/dt = - I_syn / tau_syn: ampere (unless refractory)
     '''
-
-    blue_neurons = NeuronGroup(num_input_with_events, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
-    red_neurons = NeuronGroup(num_input_no_events, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
-
-    blue_spike_mon = SpikeMonitor(blue_neurons)
-    red_spike_mon = SpikeMonitor(red_neurons)
 
     # setup inputs
     num_input = num_input_with_events + num_input_no_events
     stim_ids, stim_times = generate_stimulus(t_sim / ms, 8., 2., jitter, sequence, num_neurons=num_input)
     inputs = SpikeGeneratorGroup(num_input, stim_ids, stim_times * ms)
     input_spike_mon = SpikeMonitor(inputs)
+
+    # setup presynaptic neuron group
+    presynaptic_neurons = NeuronGroup(num_input, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
+    presynaptic_spike_mon = SpikeMonitor(presynaptic_neurons)
 
     # setup synapses
     tau_plus = 30 * ms
@@ -279,20 +275,16 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     red_S_pre = inputs.spikes[num_input_with_events:]
     lif_S_post = lif_spike_mon.t
 
-    model = '''w:1
+    model = '''w:ampere
              dApre/dt=-Apre/tau_plus : 1 (event-driven)
              dApost/dt=-Apost/tau_minus : 1 (event-driven)
     '''
 
-    blue_on_pre = '''
-        v_post += w
-        Apre += blue_S_pre(t)
-        w = clip(w+apost, 0, w_max)
-    '''
+    # dI_syn/dt= w : ampere (clock-driven)
 
-    red_on_pre = '''
+    on_pre = '''
         v_post += w
-        Apre += red_S_pre(t)
+        Apre += 1
         w = clip(w+apost, 0, w_max)
     '''
 
@@ -301,17 +293,14 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
         w = clip(w+apre, 0, w_max)
     '''
 
-    blue_synapses = Synapses(blue_neurons, lif_neuron, model, on_pre=blue_on_pre, on_post=on_post)
-    blue_synapses.connect()
+    synapses = Synapses(presynaptic_neurons, lif_neuron, model, on_pre=on_pre, on_post=on_post)
+    synapses.connect()
+    synapses.w = w_0
 
-    red_synapses = Synapses(red_neurons, lif_neuron, model, on_pre=red_on_pre, on_post=on_post)
-    red_synapses.connect()
-
-    blue_syn_state_mon = StateMonitor(blue_synapses, ['w'], record=True, dt=1 * second)  # monitor the weights
-    red_syn_state_mon = StateMonitor(red_synapses, ['w'], record=True, dt=1 * second)  # monitor the weights
+    syn_state_mon = StateMonitor(synapses, ['w'], record=True, dt=1 * second)  # monitor the weights
 
     # define units for main simulation
-    units = [blue_neurons, red_neurons, lif_neuron, blue_spike_mon, red_spike_mon, lif_spike_mon, inputs, input_spike_mon, blue_synapses, red_synapses, blue_syn_state_mon, red_syn_state_mon]
+    units = [presynaptic_neurons, lif_neuron, presynaptic_spike_mon, lif_spike_mon, inputs, input_spike_mon, synapses, syn_state_mon]
 
     net.add(units)
 
@@ -349,7 +338,7 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
         # setup synapses, using definitions from above
 
         lw_w0 = 50 * pA
-        lw_synapses = Synapses(lw_inputs, lw_neuron, syn_eqs, on_pre=on_pre, on_post=on_post)
+        lw_synapses = Synapses(lw_inputs, lw_neuron, model, on_pre=on_pre, on_post=on_post)
         lw_synapses.connect()
         lw_synapses.w = lw_w0
 
