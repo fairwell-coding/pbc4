@@ -234,15 +234,17 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     r_event = 2 * Hz  # additional organized events for blue neurons
     theta = -55 * mV
     u_reset = -70 * mV
+    u_rest = -65 * mV
     delta_abs = 1 * ms
     tau_syn = 10 * ms
     R_m = 0.03 * Gohm
     C_m = 1500 * pF
+    tau_m = R_m * C_m
 
     # setup neuron
     lif_eqs = '''
-    du/dt = ( -(u - u_rest) + R_m * I_syn(t)) / tau_m : volt (unless refractory)
-    dI_syn/dt = - I_syn / tau_syn: ampere (unless refractory)
+        du/dt = ( -(u - u_rest) + R_m * I_syn) / tau_m : volt (unless refractory)
+        dI_syn/dt = - I_syn / tau_syn: ampere (unless refractory)
     '''
 
     # setup inputs
@@ -252,7 +254,7 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     input_spike_mon = SpikeMonitor(inputs)
 
     # setup presynaptic neuron group
-    presynaptic_neurons = NeuronGroup(num_input, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
+    presynaptic_neurons = NeuronGroup(num_input, lif_eqs, threshold="u>theta", reset="u = u_reset", refractory=delta_abs, method='euler')
     presynaptic_spike_mon = SpikeMonitor(presynaptic_neurons)
 
     # setup synapses
@@ -263,17 +265,8 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     w_0 = 100 * pA
     w_max = 200 * pA
 
-    lif_neuron = NeuronGroup(1, lif_eqs, threshold=theta, reset=u_reset, refractory=delta_abs, method='euler')
-    lif_spike_mon = SpikeMonitor(lif_neuron)
-
-    # blue_delta_t = lif_spike_mon.t - blue_spike_mon.t  # TODO: check me
-    # red_delta_t = lif_spike_mon.t - red_spike_mon.t  # TODO: check me
-    # blue_weight_update = __update_synapse_weights(alpha, blue_delta_t, lambda_, tau_minus, tau_plus)
-    # red_weight_update = __update_synapse_weights(alpha, red_delta_t, lambda_, tau_minus, tau_plus)
-
-    blue_S_pre = inputs.spikes[: num_input_with_events]
-    red_S_pre = inputs.spikes[num_input_with_events:]
-    lif_S_post = lif_spike_mon.t
+    neuron = NeuronGroup(1, lif_eqs, threshold="u>theta", reset="u = u_reset", refractory=delta_abs, method='euler')
+    spike_mon = SpikeMonitor(neuron)
 
     model = '''w:ampere
              dApre/dt=-Apre/tau_plus : 1 (event-driven)
@@ -283,24 +276,24 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     # dI_syn/dt= w : ampere (clock-driven)
 
     on_pre = '''
-        v_post += w
+        I_syn += w
         Apre += 1
-        w = clip(w+apost, 0, w_max)
+        w = clip(w - pA*Apost, 0*pA, w_max)
     '''
 
     on_post = '''
-        Apost += lif_S_post(t)
-        w = clip(w+apre, 0, w_max)
+        Apost += 1
+        w = clip(w + pA*Apre, 0*pA, w_max)
     '''
 
-    synapses = Synapses(presynaptic_neurons, lif_neuron, model, on_pre=on_pre, on_post=on_post)
+    synapses = Synapses(presynaptic_neurons, neuron, model, on_pre=on_pre, on_post=on_post)
     synapses.connect()
     synapses.w = w_0
 
     syn_state_mon = StateMonitor(synapses, ['w'], record=True, dt=1 * second)  # monitor the weights
 
     # define units for main simulation
-    units = [presynaptic_neurons, lif_neuron, presynaptic_spike_mon, lif_spike_mon, inputs, input_spike_mon, synapses, syn_state_mon]
+    units = [neuron, spike_mon, inputs, input_spike_mon, synapses, syn_state_mon, presynaptic_neurons, presynaptic_spike_mon]
 
     net.add(units)
 
