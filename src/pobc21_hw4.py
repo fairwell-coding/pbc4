@@ -286,7 +286,7 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
         w = clip(w + pA*Apre, 0*pA, w_max)
     '''
 
-    synapses = Synapses(presynaptic_neurons, neuron, model, on_pre=on_pre, on_post=on_post)
+    synapses = Synapses(inputs, neuron, model, on_pre=on_pre, on_post=on_post)
     synapses.connect()
     synapses.w = w_0
 
