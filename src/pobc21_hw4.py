@@ -261,7 +261,6 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     tau_plus = 30 * ms
     tau_minus = 30 * ms
     lambda_ = 1 * pA
-    alpha = 1.1
     w_0 = 100 * pA
     w_max = 200 * pA
 
@@ -547,10 +546,10 @@ if __name__ == '__main__':
     # experiment(title='task_b', plot_learning_window=True, sequence=True)
 
     # task 4d
-    # experiment(title='task_b', plot_learning_window=True, alpha=1)
+    experiment(title='task_b', plot_learning_window=True, alpha=1)
 
     # task 4e
-    experiment(title='task_b', plot_learning_window=True, jitter=15, t_sim=300)
+    # experiment(title='task_b', plot_learning_window=True, jitter=15, t_sim=300)
 
     plt.show()  # avoid having multiple plt.show()s in your code
 
