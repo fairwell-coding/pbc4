@@ -273,8 +273,6 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
              dApost/dt=-Apost/tau_minus : 1 (event-driven)
     '''
 
-    # dI_syn/dt= w : ampere (clock-driven)
-
     on_pre = '''
         I_syn += w
         Apre += 1
@@ -538,11 +536,59 @@ def __update_synapse_weights(alpha, delta_t, lambda_, tau_minus, tau_plus):
 
 
 if __name__ == '__main__':
+    # task 4a
+    # experiment(title='task_a', plot_learning_window=True)
 
-    # run experiments
+    # task 4b
+    # experiment(title='task_b', plot_learning_window=True, jitter=5)
+    # experiment(title='task_b', plot_learning_window=True, jitter=15)
 
-    experiment(sequence=False, jitter=0, title='task_a', plot_learning_window=True)
+    # task 4c
+    # experiment(title='task_b', plot_learning_window=True, sequence=True)
 
-    ...
+    # task 4d
+    # experiment(title='task_b', plot_learning_window=True, alpha=1)
 
-    plt.show() # avoid having multiple plt.show()s in your code
+    # task 4e
+    experiment(title='task_b', plot_learning_window=True, jitter=15, t_sim=300)
+
+    plt.show()  # avoid having multiple plt.show()s in your code
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#
