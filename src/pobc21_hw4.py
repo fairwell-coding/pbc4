@@ -282,7 +282,7 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
     '''
 
     on_post = '''
-        Apost += 1
+        Apost += 1 * alpha
         w = clip(w + pA*Apre, 0*pA, w_max)
     '''
 
