@@ -200,7 +200,7 @@ def binned_correlation(t1_, t2_, binsize, corr_range):
     return t_, corr_
 
 
-def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot_learning_window=False):
+def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot_learning_window=False, recovering_parameter=1):
     """
     Perform a single STDP experiment.
 
@@ -259,7 +259,8 @@ def experiment(*, sequence=False, jitter=0, alpha=1.1, t_sim=200, title='', plot
 
     # setup synapses
     tau_plus = 30 * ms
-    tau_minus = 30 * ms
+    # tau_minus = 30 * ms
+    tau_minus = 30 * ms * recovering_parameter
     lambda_ = 1 * pA
     w_0 = 100 * pA
     w_max = 200 * pA
@@ -546,7 +547,8 @@ if __name__ == '__main__':
     # experiment(title='task_b', plot_learning_window=True, sequence=True)
 
     # task 4d
-    experiment(title='task_b', plot_learning_window=True, alpha=1)
+    # experiment(title='task_b', plot_learning_window=True, alpha=1)
+    experiment(title='task_b', plot_learning_window=True, recovering_parameter=np.log(1.1))  # calling experiment with alpha = 1.1 but applying additional log(1.1) factor to tau_minus to recover behavior of task 4a
 
     # task 4e
     # experiment(title='task_b', plot_learning_window=True, jitter=15, t_sim=300)
